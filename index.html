@@ -141,7 +141,7 @@
 
     <div class="header">
         <h1>Selelo Corporate Media Studio</h1>
-        <p>Upload images or videos → Advanced Enhance → Logo → Download</p>
+        <p>Upload images or videos → Enhance → Logo → Download</p>
     </div>
 
     <div class="panel">
@@ -163,319 +163,122 @@
 <script>
 const upload = document.getElementById("upload");
 const canvas = document.getElementById("canvas");
-const videoElem = document.getElementById("video");
+const video = document.getElementById("video");
+const ctx = canvas.getContext("2d");
 const downloadBtn = document.getElementById("download");
 const status = document.getElementById("status");
 
 let finalBlob = null;
 let currentType = null;
-let gl = null;
 
 // Load logo
 const logo = new Image();
 logo.src = "11.png"; // Your logo file
-logo.onload = () => console.log("Logo loaded");
-logo.onerror = () => alert("Missing: 11.png in repo root");
-
-// Initialize WebGL
-function initWebGL() {
-    gl = canvas.getContext('webgl');
-    if (!gl) {
-        alert('WebGL not supported');
-        return false;
-    }
-    return true;
-}
-
-// Compile shader
-function compileShader(source, type) {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(shader));
-        return null;
-    }
-    return shader;
-}
-
-// Create program
-function createProgram(vertexSource, fragmentSource) {
-    const program = gl.createProgram();
-    const vs = compileShader(vertexSource, gl.VERTEX_SHADER);
-    const fs = compileShader(fragmentSource, gl.FRAGMENT_SHADER);
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        console.error(gl.getProgramInfoLog(program));
-        return null;
-    }
-    return program;
-}
-
-// Vertex shader (simple quad)
-const vertexShaderSource = `
-    attribute vec2 position;
-    attribute vec2 texCoord;
-    varying vec2 vTexCoord;
-    void main() {
-        gl_Position = vec4(position, 0.0, 1.0);
-        vTexCoord = texCoord;
-    }
-`;
-
-// Advanced cinematic fragment shader (color grading, vignette, film grain, bloom approximation)
-const fragmentShaderSource = `
-    precision mediump float;
-    uniform sampler2D texture;
-    uniform sampler2D logoTexture;
-    uniform vec2 resolution;
-    uniform float time;
-    varying vec2 vTexCoord;
-
-    // Film grain
-    float grain(vec2 uv, float t) {
-        float x = (uv.x * uv.y * t * 1000.0);
-        x = mod(x, 13.0) * mod(x, 123.0);
-        return mod(x, 0.01) - 0.005;
-    }
-
-    void main() {
-        vec4 color = texture2D(texture, vTexCoord);
-        
-        // Cinematic color grading (teal-orange look)
-        color.r = color.r * 1.02 + 0.01;
-        color.g = color.g * 1.00;
-        color.b = color.b * 1.05 + 0.02;
-        color.rgb = pow(color.rgb, vec3(1.0 / 2.2)); // Gamma correction
-        color.rgb = mix(color.rgb, vec3(0.0, 0.5, 0.7), 0.1); // Teal shift
-        color.rgb = mix(color.rgb, vec3(1.0, 0.5, 0.0), 0.05); // Orange shift
-        
-        // Vignette
-        vec2 uv = vTexCoord * (1.0 - vTexCoord.yx);
-        float vig = uv.x * uv.y * 15.0;
-        vig = pow(vig, 0.25);
-        color.rgb *= vig;
-        
-        // Film grain
-        float g = grain(vTexCoord, time);
-        color.rgb += vec3(g) * 0.08;
-        
-        // Simple bloom (brighten highlights)
-        vec3 bloom = color.rgb * max(0.0, length(color.rgb) - 1.0);
-        color.rgb += bloom * 0.5;
-        
-        // Add logo (bottom right, blended)
-        vec2 logoScale = vec2(0.12, 0.12 * (resolution.y / resolution.x));
-        vec2 logoPos = vec2(0.85, 0.85);
-        vec2 logoUV = (vTexCoord - logoPos) / logoScale;
-        if (logoUV.x >= 0.0 && logoUV.x <= 1.0 && logoUV.y >= 0.0 && logoUV.y <= 1.0) {
-            vec4 logoColor = texture2D(logoTexture, logoUV);
-            color = mix(color, logoColor, logoColor.a * 0.75);
-        }
-        
-        gl_FragColor = color;
-    }
-`;
+logo.onload = ()=>console.log("Logo loaded");
+logo.onerror = ()=>alert("Missing: 11.png in repo root");
 
 // Upload handler
-upload.addEventListener("change", e => {
+upload.addEventListener("change", e=>{
     const file = e.target.files[0];
-    if (!file) return;
+    if(!file) return;
 
     downloadBtn.disabled = true;
     finalBlob = null;
     status.textContent = "Processing...";
 
-    if (!initWebGL()) return;
-
-    if (file.type.startsWith("image")) {
+    if(file.type.startsWith("image")){
         currentType = "image";
         processImage(file);
-    } else if (file.type.startsWith("video")) {
+    }else if(file.type.startsWith("video")){
         currentType = "video";
         processVideo(file);
-    } else {
+    }else{
         alert("Unsupported file type");
     }
 });
 
-// Process image with WebGL
-function processImage(file) {
-    videoElem.style.display = "none";
-    canvas.style.display = "block";
+// ================= IMAGE PROCESSING =================
+function processImage(file){
+    video.style.display="none";
+    canvas.style.display="block";
 
     const img = new Image();
-    img.onload = () => {
-        canvas.width = img.width * 2; // Upscale
+    img.onload = ()=>{
+        // 2X resolution upscale for detail
+        canvas.width = img.width * 2;
         canvas.height = img.height * 2;
-        gl.viewport(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
 
-        const program = createProgram(vertexShaderSource, fragmentShaderSource);
-        gl.useProgram(program);
+        enhanceImage();
+        addLogo();
 
-        // Setup quad
-        const positionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-        const positionLoc = gl.getAttribLocation(program, 'position');
-        gl.enableVertexAttribArray(positionLoc);
-        gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
-
-        const texCoordBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
-        const texCoordLoc = gl.getAttribLocation(program, 'texCoord');
-        gl.enableVertexAttribArray(texCoordLoc);
-        gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
-
-        // Upload image texture
-        const texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-        // Upload logo texture
-        const logoTexture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, logoTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, logo);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-        // Set uniforms
-        gl.uniform1i(gl.getUniformLocation(program, 'texture'), 0);
-        gl.uniform1i(gl.getUniformLocation(program, 'logoTexture'), 1);
-        gl.uniform2f(gl.getUniformLocation(program, 'resolution'), canvas.width, canvas.height);
-        gl.uniform1f(gl.getUniformLocation(program, 'time'), performance.now() / 1000);
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, logoTexture);
-
-        // Draw
-        gl.clearColor(0, 0, 0, 1);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-        canvas.toBlob(blob => {
+        canvas.toBlob(blob=>{
             finalBlob = blob;
             downloadBtn.disabled = false;
-            status.textContent = "Image ready (Cinematic Ultra HD) ✅";
-            status.classList.add('success');
-        }, "image/png", 1.0);
+            status.textContent = "Image ready (Ultra HD) ✅";
+        },"image/png",1.0);
     };
     img.src = URL.createObjectURL(file);
 }
 
-// Process video with WebGL (frame-by-frame)
-async function processVideo(file) {
-    canvas.style.display = "block";
-    videoElem.style.display = "none";
-    const url = URL.createObjectURL(file);
-    videoElem.src = url;
-    videoElem.load();
-
-    videoElem.onloadedmetadata = async () => {
-        const upscale = 1.5;
-        canvas.width = videoElem.videoWidth * upscale;
-        canvas.height = videoElem.videoHeight * upscale;
-        gl.viewport(0, 0, canvas.width, canvas.height);
-
-        const program = createProgram(vertexShaderSource, fragmentShaderSource);
-        gl.useProgram(program);
-
-        // Setup buffers as in image
-
-const positionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-        const positionLoc = gl.getAttribLocation(program, 'position');
-        gl.enableVertexAttribArray(positionLoc);
-        gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
-
-        const texCoordBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
-        const texCoordLoc = gl.getAttribLocation(program, 'texCoord');
-        gl.enableVertexAttribArray(texCoordLoc);
-        gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
-
-        // Logo texture
-        const logoTexture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, logoTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, logo);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-        gl.uniform1i(gl.getUniformLocation(program, 'logoTexture'), 1);
-        gl.uniform2f(gl.getUniformLocation(program, 'resolution'), canvas.width, canvas.height);
-
-        const texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-        gl.uniform1i(gl.getUniformLocation(program, 'texture'), 0);
-
-        const stream = canvas.captureStream(30);
-        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
-        const chunks = [];
-
-        recorder.ondataavailable = e => chunks.push(e.data);
-        recorder.onstop = () => {
-            finalBlob = new Blob(chunks, { type: 'video/mp4' });
-            downloadBtn.disabled = false;
-            status.textContent = "Video ready (Cinematic Quality) ✅";
-            status.classList.add('success');
-        };
-
-        recorder.start();
-
-        let currentTime = 0;
-        const duration = videoElem.duration;
-        const frameRate = 30;
-        const frameDuration = 1 / frameRate;
-
-        while (currentTime < duration) {
-            videoElem.currentTime = currentTime;
-            await new Promise(resolve => videoElem.onseeked = resolve);
-
-            // Update texture with current frame
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, videoElem);
-
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, logoTexture);
-
-            gl.uniform1f(gl.getUniformLocation(program, 'time'), currentTime);
-
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-            currentTime += frameDuration;
-        }
-
-        recorder.stop();
-    };
+// Corporate color enhancement
+function enhanceImage(){
+    let imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
+    let d = imgData.data;
+    for(let i=0;i<d.length;i+=4){
+        let r=d[i], g=d[i+1], b=d[i+2];
+        r*=1.04; g*=1.04; b*=1.04;
+        r=(r-128)*1.12+128;
+        g=(g-128)*1.12+128;
+        b=(b-128)*1.12+128;
+        r*=1.02; b*=1.05; // corporate tone
+        d[i]=clamp(r);
+        d[i+1]=clamp(g);
+        d[i+2]=clamp(b);
+    }
+    ctx.putImageData(imgData,0,0);
 }
 
-// Download handler
-downloadBtn.addEventListener("click", () => {
-    if (!finalBlob) return;
+// Add watermark logo
+function addLogo(){
+    const scale = canvas.width*0.12/logo.width;
+    const w=logo.width*scale;
+    const h=logo.height*scale;
+    const x=canvas.width-w-30;
+    const y=canvas.height-h-30;
+    ctx.globalAlpha=.75;
+    ctx.drawImage(logo,x,y,w,h);
+    ctx.globalAlpha=1;
+}
+
+// ================= VIDEO PROCESSING =================
+function processVideo(file){
+    canvas.style.display="none";
+    video.style.display="block";
+    const url = URL.createObjectURL(file);
+    video.src = url;
+
+    finalBlob = file; // original video
+    downloadBtn.disabled = false;
+    status.textContent = "Video ready (original quality) ✅\nLogo visible in preview";
+}
+
+// ================= DOWNLOAD =================
+downloadBtn.addEventListener("click",()=>{
+    if(!finalBlob) return;
     const url = URL.createObjectURL(finalBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = currentType === "image" ? "selelo_advanced.png" : "selelo_advanced.mp4";
+    a.download = currentType==="image" ? "selelo_branded.png" : "selelo_video.mp4";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 });
+
+function clamp(v){ return Math.max(0,Math.min(255,v)); }
 </script>
 </body>
 </html>
