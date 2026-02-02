@@ -1,119 +1,163 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Selelo Media Studio</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <title>Selelo Media Studio</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
-<style>
-body{
-    margin:0;
-    font-family:"Segoe UI",Arial;
-    background:linear-gradient(135deg,#020617,#0f172a);
-    color:#f8fafc;
-    min-height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-}
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #020617, #0f172a);
+            color: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
 
-.app{
-    max-width:520px;
-    margin:auto;
-    padding:25px 15px;
-}
+        .app {
+            max-width: 520px;
+            margin: auto;
+            padding: 40px 20px;
+            background: rgba(2, 6, 23, 0.8);
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease;
+        }
 
-.header{
-    text-align:center;
-    margin-bottom:25px;
-}
+        .app:hover {
+            transform: translateY(-5px);
+        }
 
-.header h1{
-    font-size:24px;
-    color:#38bdf8;
-}
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
 
-.header p{
-    color:#94a3b8;
-    font-size:14px;
-}
+        .header h1 {
+            font-size: 28px;
+            color: #38bdf8;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
 
-.panel{
-    background:#020617;
-    border:1px solid #0f172a;
-    border-radius:16px;
-    padding:20px;
-    box-shadow:0 15px 40px rgba(0,0,0,.7);
-}
+        .header p {
+            color: #94a3b8;
+            font-size: 15px;
+            font-weight: 400;
+        }
 
-input{
-    width:100%;
-    background:#020617;
-    border:1px dashed #334155;
-    color:white;
-    padding:14px;
-    border-radius:12px;
-}
+        .panel {
+            background: #020617;
+            border: 1px solid #0f172a;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.7);
+        }
 
-.preview{
-    margin-top:20px;
-    text-align:center;
-}
+        input[type="file"] {
+            width: 100%;
+            background: #020617;
+            border: 1px dashed #334155;
+            color: #f8fafc;
+            padding: 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: border-color 0.3s ease, background 0.3s ease;
+        }
 
-canvas,video{
-    width:100%;
-    border-radius:12px;
-    margin-top:15px;
-    display:none;
-    background:black;
-}
+        input[type="file"]:hover {
+            border-color: #38bdf8;
+            background: #0f172a;
+        }
 
-.controls{
-    margin-top:20px;
-}
+        .preview {
+            margin-top: 25px;
+            text-align: center;
+            position: relative;
+        }
 
-button{
-    width:100%;
-    background:linear-gradient(135deg,#38bdf8,#0284c7);
-    border:none;
-    color:#020617;
-    padding:14px;
-    border-radius:12px;
-    font-weight:700;
-    font-size:15px;
-    cursor:pointer;
-}
+        canvas, video {
+            width: 100%;
+            border-radius: 12px;
+            margin-top: 15px;
+            display: none;
+            background: black;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            transition: opacity 0.5s ease;
+        }
 
-button:disabled{
-    background:#334155;
-    color:#94a3b8;
-}
-</style>
+        .controls {
+            margin-top: 25px;
+        }
+
+        button {
+            width: 100%;
+            background: linear-gradient(135deg, #38bdf8, #0284c7);
+            border: none;
+            color: #020617;
+            padding: 16px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #0ea5e9, #0369a1);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #334155;
+            color: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #status {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #94a3b8;
+            transition: color 0.3s ease;
+        }
+
+        #status.success {
+            color: #22c55e;
+        }
+    </style>
 </head>
 
 <body>
 
 <div class="app">
 
-<div class="header">
-<h1>Selelo Corporate Media Studio</h1>
-<p>Upload images or videos → Enhance → Logo → Download</p>
-</div>
+    <div class="header">
+        <h1>Selelo Corporate Media Studio</h1>
+        <p>Upload images or videos → Enhance → Logo → Download</p>
+    </div>
 
-<div class="panel">
-<input type="file" id="upload" accept="image/*,video/*">
+    <div class="panel">
+        <input type="file" id="upload" accept="image/*,video/*">
 
-<div class="preview">
-<canvas id="canvas"></canvas>
-<video id="video" controls></video>
-</div>
+        <div class="preview">
+            <canvas id="canvas"></canvas>
+            <video id="video" controls></video>
+        </div>
 
-<div class="controls">
-<button id="download" disabled>Download Branded Media</button>
-</div>
+        <div class="controls">
+            <button id="download" disabled>Download Branded Media</button>
+        </div>
 
-<p id="status"></p>
-</div>
+        <p id="status"></p>
+    </div>
 </div>
 
 <script>
