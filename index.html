@@ -16,7 +16,6 @@ body{
     display:flex;
     justify-content:center;
     align-items:center;
-    overflow:hidden;
 }
 
 .app{
@@ -87,7 +86,7 @@ button:disabled{background:#334155;color:#94a3b8;cursor:not-allowed;}
 <div class="app">
     <div class="header">
         <h1>Selelo Ultra-HD Media Studio</h1>
-        <p>Upload images or videos → Enhance → Download</p>
+        <p>Upload images or videos → Maximum enhancement → Download</p>
     </div>
     <div class="panel">
         <input type="file" id="upload" accept="image/*,video/*">
@@ -139,7 +138,7 @@ function processImage(file){
 
     const img=new Image();
     img.onload=()=>{
-        // 4X upscale for ultra detail
+        // 4X upscale for ultra-detail
         canvas.width=img.width*4;
         canvas.height=img.height*4;
         ctx.imageSmoothingEnabled=true;
@@ -165,7 +164,7 @@ function processVideo(file){
     const url=URL.createObjectURL(file);
     video.src=url;
 
-    finalBlob=file; // keep original video
+    finalBlob=file; // original video, unchanged
     downloadBtn.disabled=false;
     status.textContent="Video ready (original quality) ✅";
 }
