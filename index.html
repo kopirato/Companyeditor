@@ -163,7 +163,7 @@
 <script>
 const upload = document.getElementById("upload");
 const canvas = document.getElementById("canvas");
-const videoElem = document.getElementById("video");
+const video = document.getElementById("video");
 const ctx = canvas.getContext("2d");
 const downloadBtn = document.getElementById("download");
 const status = document.getElementById("status");
@@ -174,247 +174,111 @@ let currentType = null;
 // Load logo
 const logo = new Image();
 logo.src = "11.png"; // Your logo file
-logo.onload = () => console.log("Logo loaded");
-logo.onerror = () => alert("Missing: 11.png in repo root");
+logo.onload = ()=>console.log("Logo loaded");
+logo.onerror = ()=>alert("Missing: 11.png in repo root");
 
 // Upload handler
-upload.addEventListener("change", e => {
+upload.addEventListener("change", e=>{
     const file = e.target.files[0];
-    if (!file) return;
+    if(!file) return;
 
     downloadBtn.disabled = true;
     finalBlob = null;
     status.textContent = "Processing...";
 
-    if (file.type.startsWith("image")) {
+    if(file.type.startsWith("image")){
         currentType = "image";
         processImage(file);
-    } else if (file.type.startsWith("video")) {
+    }else if(file.type.startsWith("video")){
         currentType = "video";
         processVideo(file);
-    } else {
+    }else{
         alert("Unsupported file type");
     }
 });
 
-// HSL conversion helpers
-function rgbToHsl(r, g, b) {
-    r /= 255; g /= 255; b /= 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h, s, l = (max + min) / 2;
-    if (max === min) {
-        h = s = 0;
-    } else {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        switch (max) {
-            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-            case g: h = (b - r) / d + 2; break;
-            case b: h = (r - g) / d + 4; break;
-        }
-        h /= 6;
-    }
-    return [h, s, l];
-}
-
-function hslToRgb(h, s, l) {
-    let r, g, b;
-    if (s === 0) {
-        r = g = b = l;
-    } else {
-        const hue2rgb = (p, q, t) => {
-            if (t < 0) t += 1;
-            if (t > 1) t -= 1;
-            if (t < 1/6) return p + (q - p) * 6 * t;
-            if (t < 1/2) return q;
-            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-            return p;
-        };
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        const p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1/3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3);
-    }
-    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-}
-
-// Enhanced color grading (Baraka-inspired: vibrant, natural, high contrast)
-function enhanceFrame(ctx, width, height) {
-    const imgData = ctx.getImageData(0, 0, width, height);
-    const d = imgData.data;
-    for (let i = 0; i < d.length; i += 4) {
-        let [h, s, l] = rgbToHsl(d[i], d[i+1], d[i+2]);
-        
-        // Brightness and vibrancy boost
-        l = Math.min(1, Math.max(0, l * 1.04));
-        
-        // S-curve contrast for cinematic depth
-        l = 3 * l * l - 2 * l * l * l;
-        l = Math.min(1, Math.max(0, l * 1.12));
-        
-        // Saturation for rich tones, subtle hue shift for warmth
-        s = Math.min(1, s * 1.08);
-        h = (h + 0.015) % 1; // Warm shift inspired by Baraka's golden hours
-        
-        const [r, g, b] = hslToRgb(h, s, l);
-        d[i] = r; d[i+1] = g; d[i+2] = b;
-    }
-    ctx.putImageData(imgData, 0, 0);
-    
-    // Final polish with filter (vignette-like)
-    ctx.filter = 'brightness(1.02) contrast(1.05) saturate(1.08)';
-    ctx.drawImage(ctx.canvas, 0, 0);
-    ctx.filter = 'none';
-}
-
-// Sharpening for crisp details
-function sharpenFrame(ctx, width, height) {
-    const imgData = ctx.getImageData(0, 0, width, height);
-    const d = imgData.data;
-    const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
-    const side = 3, half = Math.floor(side / 2);
-    
-    for (let y = half; y < height - half; y++) {
-        for (let x = half; x < width - half; x++) {
-            let r = 0, g = 0, b = 0;
-            for (let ky = 0; ky < side; ky++) {
-                for (let kx = 0; kx < side; kx++) {
-                    const px = ((y + ky - half) * width + (x + kx - half)) * 4;
-                    const weight = kernel[ky * side + kx];
-                    r += d[px] * weight;
-                    g += d[px + 1] * weight;
-                    b += d[px + 2] * weight;
-                }
-            }
-            const idx = (y * width + x) * 4;
-            d[idx] = clamp(r);
-            d[idx + 1] = clamp(g);
-            d[idx + 2] = clamp(b);
-        }
-    }
-    ctx.putImageData(imgData, 0, 0);
-}
-
-// Advanced logo blending
-function addLogoToFrame(ctx, width, height) {
-    const scale = width * 0.12 / logo.width;
-    const w = logo.width * scale;
-    const h = logo.height * scale;
-    const x = width - w - 30;
-    const y = height - h - 30;
-    
-    ctx.save();
-    ctx.filter = 'drop-shadow(4px 4px 8px rgba(0,0,0,0.5))';
-    ctx.globalCompositeOperation = 'soft-light';
-    ctx.globalAlpha = 0.75;
-    ctx.drawImage(logo, x, y, w, h);
-    ctx.restore();
-}
-
-// Image processing
-function processImage(file) {
-    videoElem.style.display = "none";
-    canvas.style.display = "block";
+// ================= IMAGE PROCESSING =================
+function processImage(file){
+    video.style.display="none";
+    canvas.style.display="block";
 
     const img = new Image();
-    img.onload = () => {
-        const upscaleFactor = 2;
-        canvas.width = img.width * upscaleFactor;
-        canvas.height = img.height * upscaleFactor;
+    img.onload = ()=>{
+        // 2X resolution upscale for detail
+        canvas.width = img.width * 2;
+        canvas.height = img.height * 2;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
 
-        // Use OffscreenCanvas if available for better performance
-        const processingCanvas = 'OffscreenCanvas' in window ? new OffscreenCanvas(canvas.width, canvas.height) : canvas;
-        const pCtx = processingCanvas.getContext('2d');
-        pCtx.imageSmoothingEnabled = true;
-        pCtx.imageSmoothingQuality = 'high';
+        enhanceImage();
+        addLogo();
 
-        // Multi-step upscale for smoothness
-        pCtx.drawImage(img, 0, 0, img.width, img.height);
-        pCtx.drawImage(processingCanvas, 0, 0, img.width, img.height, 0, 0, canvas.width, canvas.height);
-
-        enhanceFrame(pCtx, canvas.width, canvas.height);
-        sharpenFrame(pCtx, canvas.width, canvas.height);
-        addLogoToFrame(pCtx, canvas.width, canvas.height);
-
-        if (processingCanvas instanceof OffscreenCanvas) {
-            const bitmap = processingCanvas.transferToImageBitmap();
-            ctx.drawImage(bitmap, 0, 0);
-        }
-
-        canvas.toBlob(blob => {
+        canvas.toBlob(blob=>{
             finalBlob = blob;
             downloadBtn.disabled = false;
-            status.textContent = "Image ready (Cinematic HD) ✅";
-            status.classList.add('success');
-        }, "image/png", 1.0);
+            status.textContent = "Image ready (Ultra HD) ✅";
+        },"image/png",1.0);
     };
     img.src = URL.createObjectURL(file);
 }
 
-// Video processing (frame-by-frame enhancement and export)
-async function processVideo(file) {
-    canvas.style.display = "none";
-    videoElem.style.display = "block";
-    const url = URL.createObjectURL(file);
-    videoElem.src = url;
-    videoElem.load();
-
-    videoElem.onloadedmetadata = async () => {
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCanvas.width = videoElem.videoWidth * 1.5; // 1.5x upscale for quality
-        tempCanvas.height = videoElem.videoHeight * 1.5;
-
-        const stream = tempCanvas.captureStream(30); // Assume 30fps
-        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
-        const chunks = [];
-
-        recorder.ondataavailable = e => chunks.push(e.data);
-        recorder.onstop = () => {
-            finalBlob = new Blob(chunks, { type: 'video/mp4' });
-            downloadBtn.disabled = false;
-            status.textContent = "Video ready (Cinematic Quality) ✅";
-            status.classList.add('success');
-        };
-
-        recorder.start();
-
-        let currentTime = 0;
-        const duration = videoElem.duration;
-        const frameRate = 30; // Target fps
-        const frameDuration = 1 / frameRate;
-
-        while (currentTime < duration) {
-            videoElem.currentTime = currentTime;
-            await new Promise(resolve => videoElem.onseeked = resolve);
-
-            tempCtx.drawImage(videoElem, 0, 0, tempCanvas.width, tempCanvas.height);
-            enhanceFrame(tempCtx, tempCanvas.width, tempCanvas.height);
-            sharpenFrame(tempCtx, tempCanvas.width, tempCanvas.height);
-            addLogoToFrame(tempCtx, tempCanvas.width, tempCanvas.height);
-
-            currentTime += frameDuration;
-        }
-
-        recorder.stop();
-    };
+// Corporate color enhancement
+function enhanceImage(){
+    let imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
+    let d = imgData.data;
+    for(let i=0;i<d.length;i+=4){
+        let r=d[i], g=d[i+1], b=d[i+2];
+        r*=1.04; g*=1.04; b*=1.04;
+        r=(r-128)*1.12+128;
+        g=(g-128)*1.12+128;
+        b=(b-128)*1.12+128;
+        r*=1.02; b*=1.05; // corporate tone
+        d[i]=clamp(r);
+        d[i+1]=clamp(g);
+        d[i+2]=clamp(b);
+    }
+    ctx.putImageData(imgData,0,0);
 }
 
-// Download handler
-downloadBtn.addEventListener("click", () => {
-    if (!finalBlob) return;
+// Add watermark logo
+function addLogo(){
+    const scale = canvas.width*0.12/logo.width;
+    const w=logo.width*scale;
+    const h=logo.height*scale;
+    const x=canvas.width-w-30;
+    const y=canvas.height-h-30;
+    ctx.globalAlpha=.75;
+    ctx.drawImage(logo,x,y,w,h);
+    ctx.globalAlpha=1;
+}
+
+// ================= VIDEO PROCESSING =================
+function processVideo(file){
+    canvas.style.display="none";
+    video.style.display="block";
+    const url = URL.createObjectURL(file);
+    video.src = url;
+
+    finalBlob = file; // original video
+    downloadBtn.disabled = false;
+    status.textContent = "Video ready (original quality) ✅\nLogo visible in preview";
+}
+
+// ================= DOWNLOAD =================
+downloadBtn.addEventListener("click",()=>{
+    if(!finalBlob) return;
     const url = URL.createObjectURL(finalBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = currentType === "image" ? "selelo_branded.png" : "selelo_branded.mp4";
+    a.download = currentType==="image" ? "selelo_branded.png" : "selelo_video.mp4";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 });
 
-function clamp(v) { return Math.max(0, Math.min(255, v)); }
+function clamp(v){ return Math.max(0,Math.min(255,v)); }
 </script>
 </body>
 </html>
