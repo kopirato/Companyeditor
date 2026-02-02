@@ -141,7 +141,7 @@
 
     <div class="header">
         <h1>Selelo Corporate Media Studio</h1>
-        <p>Upload images or videos → Enhance → Logo → Download</p>
+        <p>Upload images or videos → Enhance → Download</p>
     </div>
 
     <div class="panel">
@@ -153,7 +153,7 @@
         </div>
 
         <div class="controls">
-            <button id="download" disabled>Download Branded Media</button>
+            <button id="download" disabled>Download Media</button>
         </div>
 
         <p id="status"></p>
@@ -170,12 +170,6 @@ const status = document.getElementById("status");
 
 let finalBlob = null;
 let currentType = null;
-
-// Load logo
-const logo = new Image();
-logo.src = "11.png"; // Your logo file
-logo.onload = ()=>console.log("Logo loaded");
-logo.onerror = ()=>alert("Missing: 11.png in repo root");
 
 // Upload handler
 upload.addEventListener("change", e=>{
@@ -212,7 +206,6 @@ function processImage(file){
         ctx.drawImage(img,0,0,canvas.width,canvas.height);
 
         enhanceImage();
-        addLogo();
 
         canvas.toBlob(blob=>{
             finalBlob = blob;
@@ -241,18 +234,6 @@ function enhanceImage(){
     ctx.putImageData(imgData,0,0);
 }
 
-// Add watermark logo
-function addLogo(){
-    const scale = canvas.width*0.12/logo.width;
-    const w=logo.width*scale;
-    const h=logo.height*scale;
-    const x=canvas.width-w-30;
-    const y=canvas.height-h-30;
-    ctx.globalAlpha=.75;
-    ctx.drawImage(logo,x,y,w,h);
-    ctx.globalAlpha=1;
-}
-
 // ================= VIDEO PROCESSING =================
 function processVideo(file){
     canvas.style.display="none";
@@ -262,7 +243,7 @@ function processVideo(file){
 
     finalBlob = file; // original video
     downloadBtn.disabled = false;
-    status.textContent = "Video ready (original quality) ✅\nLogo visible in preview";
+    status.textContent = "Video ready (original quality) ✅";
 }
 
 // ================= DOWNLOAD =================
@@ -271,7 +252,7 @@ downloadBtn.addEventListener("click",()=>{
     const url = URL.createObjectURL(finalBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = currentType==="image" ? "selelo_branded.png" : "selelo_video.mp4";
+    a.download = currentType==="image" ? "selelo_hd.png" : "selelo_video.mp4";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
