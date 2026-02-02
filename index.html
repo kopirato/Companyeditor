@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Selelo Media Enhancer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+    font-family:Arial, sans-serif;
+    background:#020617;
+    color:white;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+}
+
+.box{
+    background:#020617;
+    border:1px solid #0f172a;
+    padding:25px;
+    width:100%;
+    max-width:450px;
+    border-radius:12px;
+    text-align:center;
+}
+
+h2{
+    color:#38bdf8;
+}
+
+input{
+    width:100%;
+    margin:15px 0;
+}
+
+canvas{
+    width:100%;
+    display:none;
+    border-radius:8px;
+}
+
+button{
+    background:#38bdf8;
+    border:none;
+    padding:12px;
+    width:100%;
+    font-weight:bold;
+    border-radius:8px;
+    cursor:pointer;
+    margin-top:15px;
+}
+
+button:disabled{
+    background:#64748b;
+}
+</style>
+</head>
+
+<body>
+
+<div class="box">
+
+<h2>Selelo Media Enhancer</h2>
+<p>Upload → Enhance → Brand → Download</p>
+
+<input type="file" id="upload" accept="image/*">
+
+<canvas id="canvas"></canvas>
+
+<button id="download" disabled>
+Download Branded HQ Image
+</button>
+
+</div>
+
+
+<script>
+
+const upload = document.getElementById("upload");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const downloadBtn = document.getElementById("download");
+
+const logo = new Image();
+logo.src = "logo.png"; // must exist in repo
+
+let finalBlob = null;
+
+
+// Enhancement settings
+const enhanceSettings = {
+    brightness: 1.05,
+    contrast: 1.15,
+    saturation: 1.25,
+    sharpen: true
+};
+
+
+upload.addEventListener("change", e => {
+
+    const file = e.target.files[0];
+    if(!file) return;
+
+    const img = new Image();
+
+    img.onload = () => {
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        canvas.style.display = "block";
+
+        // Draw original
+        ctx.drawImage(img,0,0);
+
+        // Apply color enhancement
+        applyEnhancement();
+
+        // Add watermark logo
+        addLogo();
+
+        // Prepare download
+        canvas.toBlob(blob=>{
+            finalBlob = blob;
+            downloadBtn.disabled = false;
+        },"image/png",1.0);
+
+    };
+
+    img.src = URL.createObjectURL(file);
+
+});
+
+
+// Color Enhancement
+function applyEnhancement(){
+
+    let imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
+    let data = imgData.data;
+
+    for(let i=0;i<data.length;i+=4){
+
+        let r = data[i];
+        let g = data[i+1];
+        let b = data[i+2];
+
+        // Brightness
+        r *= enhanceSettings.brightness;
+        g *= enhanceSettings.brightness;
+        b *= enhanceSettings.brightness;
+
+        // Contrast
+        r = ((r-128)*enhanceSettings.contrast)+128;
+        g = ((g-128)*enhanceSettings.contrast)+128;
+        b = ((b-128)*enhanceSettings.contrast)+128;
+
+        // Saturation
+        let avg = (r+g+b)/3;
+
+        r = avg + (r-avg)*enhanceSettings.saturation;
+        g = avg + (g-avg)*enhanceSettings.saturation;
+        b = avg + (b-avg)*enhanceSettings.saturation;
+
+        data[i]   = clamp(r);
+        data[i+1] = clamp(g);
+        data[i+2] = clamp(b);
+    }
+
+    ctx.putImageData(imgData,0,0);
+}
+
+
+// Add Logo Watermark
+function addLogo(){
+
+    const scale = canvas.width * 0.15 / logo.width;
+
+    const w = logo.width * scale;
+    const h = logo.height * scale;
+
+    const x = canvas.width - w - 20;
+    const y = canvas.height - h - 20;
+
+    ctx.globalAlpha = 0.7; // blending
+    ctx.drawImage(logo,x,y,w,h);
+    ctx.globalAlpha = 1.0;
+}
+
+
+// Clamp colors
+function clamp(v){
+    return Math.max(0,Math.min(255,v));
+}
+
+
+// Download
+downloadBtn.addEventListener("click",()=>{
+
+    if(!finalBlob) return;
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(finalBlob);
+    a.download = "selelo_branded_image.png";
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+});
+
+</script>
+
+</body>
+</html>
